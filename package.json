@@ -12,7 +12,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "electron:dev": "cross-env NODE_ENV=development concurrently \"vite\" \"wait-on tcp:5173 && electron .\"",
-    "electron:build": "npm run build && electron-builder --mac --arm64"
+    "electron:build": "npm run build && electron-builder --mac --arm64 --publish never"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^18.0.1",
