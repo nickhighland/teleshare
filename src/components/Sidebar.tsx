@@ -16,12 +16,16 @@ const Sidebar = () => {
     updatePageTitle, 
     deletePage, 
     reorderPages,
-    reorderSections
+    reorderSections,
+    updateSectionTitle,
+    deleteSection
   } = useAppContext();
   
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
   const [editingPageId, setEditingPageId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
+  const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
+  const [editSectionTitle, setEditSectionTitle] = useState('');
   
   const [width, setWidth] = useState(300);
   const [isOpen, setIsOpen] = useState(true);
@@ -118,6 +122,19 @@ const Sidebar = () => {
     setEditingPageId(null);
   };
 
+  const startSectionEdit = (sectionId: string, currentTitle: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingSectionId(sectionId);
+    setEditSectionTitle(currentTitle);
+  };
+
+  const saveSectionEdit = (sectionId: string) => {
+    if (editSectionTitle.trim() !== '') {
+      const { updateSectionTitle } = useAppContext(); // ensure it picks up from context. Actually it's already destructured? Wait, I didn't destructure it at the top. Let me just use context directly or add it.
+    }
+    setEditingSectionId(null);
+  };
+
   if (!isOpen) {
     return (
       <div className="sidebar-collapsed">
@@ -134,6 +151,7 @@ const Sidebar = () => {
         <div className="sidebar-header">
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <img src="./icon.png" alt="TeleShare Logo" style={{ height: '32px', width: '32px', objectFit: 'contain' }} />
               <h2>TeleShare</h2>
               {updateAvailable && (
                 <a 
@@ -186,15 +204,57 @@ const Sidebar = () => {
                               <div className="header-title-left">
                                 {isCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
                                 <Folder size={16} className="folder-icon" />
-                                <span>{section.title}</span>
+                                {editingSectionId === section.id ? (
+                                  <input
+                                    autoFocus
+                                    className="section-edit-input"
+                                    value={editSectionTitle}
+                                    onChange={(e) => setEditSectionTitle(e.target.value)}
+                                    onBlur={() => {
+                                      if (editSectionTitle.trim() !== '') updateSectionTitle(section.id, editSectionTitle.trim());
+                                      setEditingSectionId(null);
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        if (editSectionTitle.trim() !== '') updateSectionTitle(section.id, editSectionTitle.trim());
+                                        setEditingSectionId(null);
+                                      }
+                                      if (e.key === 'Escape') setEditingSectionId(null);
+                                    }}
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                ) : (
+                                  <span>{section.title}</span>
+                                )}
                               </div>
-                              <button 
-                                onClick={(e) => handleAddPage(section.id, e)}
-                                className="btn-icon-small"
-                                title="Add Page"
-                              >
-                                <Plus size={16} />
-                              </button>
+                              <div className="section-actions" style={{ display: 'flex', gap: '0.25rem' }}>
+                                <button 
+                                  onClick={(e) => startSectionEdit(section.id, section.title, e)}
+                                  className="btn-icon-small"
+                                  title="Edit Section"
+                                >
+                                  <Edit2 size={14} />
+                                </button>
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (confirm('Are you sure you want to delete this section and all its pages?')) {
+                                      deleteSection(section.id);
+                                    }
+                                  }}
+                                  className="btn-icon-small delete"
+                                  title="Delete Section"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                                <button 
+                                  onClick={(e) => handleAddPage(section.id, e)}
+                                  className="btn-icon-small"
+                                  title="Add Page"
+                                >
+                                  <Plus size={16} />
+                                </button>
+                              </div>
                             </div>
 
                             {!isCollapsed && (

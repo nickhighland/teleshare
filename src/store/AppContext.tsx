@@ -9,6 +9,8 @@ interface AppContextType {
   activePageId: string | null;
   setActivePageId: (id: string | null) => void;
   addSection: (title: string) => void;
+  updateSectionTitle: (sectionId: string, title: string) => void;
+  deleteSection: (sectionId: string) => void;
   addPage: (sectionId: string, title: string) => void;
   updatePageTitle: (pageId: string, title: string) => void;
   deletePage: (sectionId: string, pageId: string) => void;
@@ -101,6 +103,43 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       sections: [...prev.sections, newSection],
       sectionOrder: [...prev.sectionOrder, newSection.id]
     }));
+  };
+
+  const updateSectionTitle = (sectionId: string, title: string) => {
+    setState(prev => ({
+      ...prev,
+      sections: prev.sections.map(s => 
+        s.id === sectionId ? { ...s, title } : s
+      )
+    }));
+  };
+
+  const deleteSection = (sectionId: string) => {
+    setState(prev => {
+      const sectionToDelete = prev.sections.find(s => s.id === sectionId);
+      if (!sectionToDelete) return prev;
+
+      // Clean up pages
+      const newPages = { ...prev.pages };
+      sectionToDelete.pageIds.forEach(id => {
+        delete newPages[id];
+      });
+
+      return {
+        ...prev,
+        sections: prev.sections.filter(s => s.id !== sectionId),
+        sectionOrder: prev.sectionOrder.filter(id => id !== sectionId),
+        pages: newPages
+      };
+    });
+    
+    // Check if active page was in the deleted section
+    setState(prev => {
+      if (activePageId && !prev.pages[activePageId]) {
+        setActivePageId(null);
+      }
+      return prev;
+    });
   };
 
   const addPage = (sectionId: string, title: string) => {
@@ -251,6 +290,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     activePageId,
     setActivePageId,
     addSection,
+    updateSectionTitle,
+    deleteSection,
     addPage,
     updatePageTitle,
     deletePage,

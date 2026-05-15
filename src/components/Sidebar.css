@@ -159,12 +159,33 @@
   height: 24px;
   border-radius: var(--radius-sm);
   color: var(--text-secondary);
-  opacity: 0;
-  transition: opacity 0.2s, background-color 0.2s;
+  transition: background-color 0.2s;
 }
 
-.header-title:hover .btn-icon-small {
+.section-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.header-title:hover .section-actions {
   opacity: 1;
+}
+
+.section-edit-input {
+  flex: 1;
+  background: var(--bg-primary);
+  border: 1px solid var(--accent-color);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 0.875rem;
+  font-family: inherit;
+  font-weight: 600;
+  color: var(--text-primary);
+  outline: none;
+  min-width: 0;
 }
 
 .btn-icon-small:hover {

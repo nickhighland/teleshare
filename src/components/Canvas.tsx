@@ -60,12 +60,11 @@ const Canvas = () => {
       if (!items) return;
 
       for (let i = 0; i < items.length; i++) {
-        if (items[i].type.indexOf('image') !== -1) {
+        if (items[i].kind === 'file') {
           const file = items[i].getAsFile();
           if (file) {
             processFile(file, 50, 50);
           }
-          break; // Only handle the first image pasted
         }
       }
     };
@@ -222,10 +221,11 @@ const Canvas = () => {
     try {
       const clipboardItems = await navigator.clipboard.read();
       for (const clipboardItem of clipboardItems) {
-        const imageTypes = clipboardItem.types.filter(type => type.startsWith('image/'));
-        for (const imageType of imageTypes) {
-          const blob = await clipboardItem.getType(imageType);
-          const file = new File([blob], "pasted-image.png", { type: imageType });
+        const fileTypes = clipboardItem.types.filter(type => type.startsWith('image/') || type.startsWith('video/') || type === 'application/pdf');
+        for (const fileType of fileTypes) {
+          const blob = await clipboardItem.getType(fileType);
+          const ext = fileType.split('/')[1] || 'bin';
+          const file = new File([blob], `pasted-file.${ext}`, { type: fileType });
           processFile(file, contextMenu.x, contextMenu.y);
           break;
         }
@@ -276,7 +276,7 @@ const Canvas = () => {
           >
             <button className="context-menu-item" onClick={handleContextMenuPaste}>
               <ClipboardPaste size={16} />
-              Paste Image
+              Paste
             </button>
           </div>
         )}
