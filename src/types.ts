@@ -17,15 +17,15 @@ export interface Page {
   mediaItems: MediaItem[];
 }
 
-export interface Header {
+export interface Section {
   id: string;
   title: string;
   pageIds: string[]; // references to pages
 }
 
-// To make drag and drop between headers easier, we can normalize the state
+// To make drag and drop between sections easier, we can normalize the state
 export interface AppState {
-  headers: Header[];
+  sections: Section[];
   pages: Record<string, Page>; // pageId -> Page
-  headerOrder: string[]; // id of headers in order
+  sectionOrder: string[]; // id of sections in order
 }

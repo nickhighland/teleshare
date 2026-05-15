@@ -2,17 +2,18 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import localforage from 'localforage';
 import { v4 as uuidv4 } from 'uuid';
-import type { AppState, Header, Page, MediaItem } from '../types';
+import type { AppState, Section, Page, MediaItem } from '../types';
 
 interface AppContextType {
   state: AppState;
   activePageId: string | null;
   setActivePageId: (id: string | null) => void;
-  addHeader: (title: string) => void;
-  addPage: (headerId: string, title: string) => void;
+  addSection: (title: string) => void;
+  addPage: (sectionId: string, title: string) => void;
   updatePageTitle: (pageId: string, title: string) => void;
-  deletePage: (headerId: string, pageId: string) => void;
-  reorderPages: (sourceHeaderId: string, destinationHeaderId: string, sourceIndex: number, destinationIndex: number, pageId: string) => void;
+  deletePage: (sectionId: string, pageId: string) => void;
+  reorderPages: (sourceSectionId: string, destinationSectionId: string, sourceIndex: number, destinationIndex: number, pageId: string) => void;
+  reorderSections: (sourceIndex: number, destinationIndex: number, sectionId: string) => void;
   addMediaItem: (pageId: string, item: Omit<MediaItem, 'id'>) => void;
   updateMediaItem: (pageId: string, itemId: string, updates: Partial<MediaItem>) => void;
   deleteMediaItem: (pageId: string, itemId: string) => void;
@@ -20,9 +21,9 @@ interface AppContextType {
 }
 
 const defaultState: AppState = {
-  headers: [],
+  sections: [],
   pages: {},
-  headerOrder: [],
+  sectionOrder: [],
 };
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -38,20 +39,30 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const loadState = async () => {
       try {
-        const savedState = await localforage.getItem<AppState>(STORAGE_KEY);
+        const savedState = await localforage.getItem<any>(STORAGE_KEY);
         if (savedState) {
-          setState(savedState);
+          // Migration from headers to sections
+          if (savedState.headers) {
+            savedState.sections = savedState.headers;
+            delete savedState.headers;
+          }
+          if (savedState.headerOrder) {
+            savedState.sectionOrder = savedState.headerOrder;
+            delete savedState.headerOrder;
+          }
+          
+          setState(savedState as AppState);
           // Set first page as active if possible
-          if (savedState.headers.length > 0 && savedState.headers[0].pageIds.length > 0) {
-            setActivePageId(savedState.headers[0].pageIds[0]);
+          if (savedState.sections.length > 0 && savedState.sections[0].pageIds.length > 0) {
+            setActivePageId(savedState.sections[0].pageIds[0]);
           }
         } else {
-          // Initialize with a default header and page
-          const defaultHeaderId = uuidv4();
+          // Initialize with a default section and page
+          const defaultSectionId = uuidv4();
           const defaultPageId = uuidv4();
           
           const initialState: AppState = {
-            headers: [{ id: defaultHeaderId, title: 'Default Header', pageIds: [defaultPageId] }],
+            sections: [{ id: defaultSectionId, title: 'Default Section', pageIds: [defaultPageId] }],
             pages: {
               [defaultPageId]: {
                 id: defaultPageId,
@@ -59,7 +70,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                 mediaItems: []
               }
             },
-            headerOrder: [defaultHeaderId]
+            sectionOrder: [defaultSectionId]
           };
           setState(initialState);
           setActivePageId(defaultPageId);
@@ -83,26 +94,26 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [state, isLoaded]);
 
-  const addHeader = (title: string) => {
-    const newHeader: Header = { id: uuidv4(), title, pageIds: [] };
+  const addSection = (title: string) => {
+    const newSection: Section = { id: uuidv4(), title, pageIds: [] };
     setState(prev => ({
       ...prev,
-      headers: [...prev.headers, newHeader],
-      headerOrder: [...prev.headerOrder, newHeader.id]
+      sections: [...prev.sections, newSection],
+      sectionOrder: [...prev.sectionOrder, newSection.id]
     }));
   };
 
-  const addPage = (headerId: string, title: string) => {
+  const addPage = (sectionId: string, title: string) => {
     const newPage: Page = { id: uuidv4(), title, mediaItems: [] };
     setState(prev => {
       const newPages = { ...prev.pages, [newPage.id]: newPage };
-      const newHeaders = prev.headers.map(h => {
-        if (h.id === headerId) {
-          return { ...h, pageIds: [...h.pageIds, newPage.id] };
+      const newSections = prev.sections.map(s => {
+        if (s.id === sectionId) {
+          return { ...s, pageIds: [...s.pageIds, newPage.id] };
         }
-        return h;
+        return s;
       });
-      return { ...prev, pages: newPages, headers: newHeaders };
+      return { ...prev, pages: newPages, sections: newSections };
     });
     setActivePageId(newPage.id);
   };
@@ -117,17 +128,17 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }));
   };
 
-  const deletePage = (headerId: string, pageId: string) => {
+  const deletePage = (sectionId: string, pageId: string) => {
     setState(prev => {
-      const newHeaders = prev.headers.map(h => {
-        if (h.id === headerId) {
-          return { ...h, pageIds: h.pageIds.filter(id => id !== pageId) };
+      const newSections = prev.sections.map(s => {
+        if (s.id === sectionId) {
+          return { ...s, pageIds: s.pageIds.filter(id => id !== pageId) };
         }
-        return h;
+        return s;
       });
       const newPages = { ...prev.pages };
       delete newPages[pageId];
-      return { ...prev, headers: newHeaders, pages: newPages };
+      return { ...prev, sections: newSections, pages: newPages };
     });
     
     if (activePageId === pageId) {
@@ -135,36 +146,46 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const reorderPages = (sourceHeaderId: string, destinationHeaderId: string, sourceIndex: number, destinationIndex: number, pageId: string) => {
+  const reorderPages = (sourceSectionId: string, destinationSectionId: string, sourceIndex: number, destinationIndex: number, pageId: string) => {
     setState(prev => {
-      const newHeaders = [...prev.headers];
+      const newSections = [...prev.sections];
       
-      const sourceHeaderIndex = newHeaders.findIndex(h => h.id === sourceHeaderId);
-      const destHeaderIndex = newHeaders.findIndex(h => h.id === destinationHeaderId);
+      const sourceSectionIndex = newSections.findIndex(s => s.id === sourceSectionId);
+      const destSectionIndex = newSections.findIndex(s => s.id === destinationSectionId);
       
-      const sourceHeader = newHeaders[sourceHeaderIndex];
-      const destHeader = newHeaders[destHeaderIndex];
+      const sourceSection = newSections[sourceSectionIndex];
+      const destSection = newSections[destSectionIndex];
       
-      // Moving within the same header
-      if (sourceHeaderId === destinationHeaderId) {
-        const newPageIds = Array.from(sourceHeader.pageIds);
+      // Moving within the same section
+      if (sourceSectionId === destinationSectionId) {
+        const newPageIds = Array.from(sourceSection.pageIds);
         newPageIds.splice(sourceIndex, 1);
         newPageIds.splice(destinationIndex, 0, pageId);
         
-        newHeaders[sourceHeaderIndex] = { ...sourceHeader, pageIds: newPageIds };
+        newSections[sourceSectionIndex] = { ...sourceSection, pageIds: newPageIds };
       } else {
-        // Moving to a different header
-        const sourcePageIds = Array.from(sourceHeader.pageIds);
+        // Moving to a different section
+        const sourcePageIds = Array.from(sourceSection.pageIds);
         sourcePageIds.splice(sourceIndex, 1);
         
-        const destPageIds = Array.from(destHeader.pageIds);
+        const destPageIds = Array.from(destSection.pageIds);
         destPageIds.splice(destinationIndex, 0, pageId);
         
-        newHeaders[sourceHeaderIndex] = { ...sourceHeader, pageIds: sourcePageIds };
-        newHeaders[destHeaderIndex] = { ...destHeader, pageIds: destPageIds };
+        newSections[sourceSectionIndex] = { ...sourceSection, pageIds: sourcePageIds };
+        newSections[destSectionIndex] = { ...destSection, pageIds: destPageIds };
       }
       
-      return { ...prev, headers: newHeaders };
+      return { ...prev, sections: newSections };
+    });
+  };
+
+  const reorderSections = (sourceIndex: number, destinationIndex: number, sectionId: string) => {
+    setState(prev => {
+      const newSectionOrder = Array.from(prev.sectionOrder);
+      newSectionOrder.splice(sourceIndex, 1);
+      newSectionOrder.splice(destinationIndex, 0, sectionId);
+      
+      return { ...prev, sectionOrder: newSectionOrder };
     });
   };
 
@@ -229,11 +250,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     state,
     activePageId,
     setActivePageId,
-    addHeader,
+    addSection,
     addPage,
     updatePageTitle,
     deletePage,
     reorderPages,
+    reorderSections,
     addMediaItem,
     updateMediaItem,
     deleteMediaItem,

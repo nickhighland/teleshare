@@ -114,6 +114,15 @@
 
 .header-group {
   margin-bottom: 0.5rem;
+  background-color: var(--bg-secondary);
+  border-radius: var(--radius-md);
+}
+
+.dragging-section {
+  box-shadow: var(--shadow-md);
+  opacity: 0.95;
+  z-index: 100;
+  background-color: var(--bg-primary);
 }
 
 .header-title {
