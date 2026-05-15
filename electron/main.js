@@ -22,9 +22,18 @@ const createWindow = () => {
   });
 
   mainWindow.webContents.session.on('will-download', (event, item, webContents) => {
-    // Save to temp folder without prompt
-    const downloadPath = path.join(app.getPath('temp'), item.getFilename());
-    item.setSavePath(downloadPath);
+    // Only intercept the auto-updater zip file
+    const isUpdateZip = item.getFilename().endsWith('.zip') && item.getFilename().includes('TeleShare');
+    
+    if (isUpdateZip) {
+      // Save to temp folder without prompt
+      const downloadPath = path.join(app.getPath('temp'), item.getFilename());
+      item.setSavePath(downloadPath);
+    } else {
+      // For normal downloads (like saving media), don't intercept the save path
+      // You can just return here and let Electron show the standard save dialog
+      // But we still want to track progress if needed, though not strictly required
+    }
 
     item.on('updated', (event, state) => {
       if (state === 'progressing' && !item.isPaused()) {
@@ -38,7 +47,9 @@ const createWindow = () => {
         mainWindow.webContents.send('download-complete');
         
         // Custom Tauri-style auto-updater for macOS
-        if (process.platform === 'darwin' && downloadPath.endsWith('.zip')) {
+        const isUpdateZip = item.getFilename().endsWith('.zip') && item.getFilename().includes('TeleShare');
+        if (process.platform === 'darwin' && isUpdateZip) {
+          const downloadPath = item.getSavePath();
           const extractPath = path.join(app.getPath('temp'), 'teleshare-update');
           
           // Ensure extract path is clean
@@ -102,9 +113,9 @@ open "${currentAppPath}"
               }
             });
           });
-        } else {
+        } else if (isUpdateZip) {
           // If not mac or not zip, just open it (fallback)
-          shell.openPath(downloadPath);
+          shell.openPath(item.getSavePath());
         }
       } else {
         mainWindow.webContents.send('download-error', state);
@@ -126,6 +137,9 @@ open "${currentAppPath}"
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
   }
 };
+
+app.commandLine.appendSwitch('password-store', 'basic');
+app.commandLine.appendSwitch('use-mock-keychain');
 
 app.whenReady().then(() => {
   createWindow();
