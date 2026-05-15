@@ -17,15 +17,18 @@ const createWindow = () => {
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false, // For simpler migration, but consider true for security in prod
-      webSecurity: false // Necessary for some iframes and drag/drop local files
+      webSecurity: false, // Necessary for some iframes and drag/drop local files
+      webviewTag: true // Necessary for embedding external webpages
     },
   });
 
   mainWindow.webContents.session.on('will-download', (event, item, webContents) => {
-    // Only intercept the auto-updater zip file
+    // Only intercept the auto-updater zip file or exe file
     const isUpdateZip = item.getFilename().endsWith('.zip') && item.getFilename().includes('TeleShare');
+    const isUpdateExe = item.getFilename().endsWith('.exe') && item.getFilename().includes('TeleShare');
+    const isUpdate = isUpdateZip || isUpdateExe;
     
-    if (isUpdateZip) {
+    if (isUpdate) {
       // Save to temp folder without prompt
       const downloadPath = path.join(app.getPath('temp'), item.getFilename());
       item.setSavePath(downloadPath);
@@ -113,8 +116,17 @@ open "${currentAppPath}"
               }
             });
           });
-        } else if (isUpdateZip) {
-          // If not mac or not zip, just open it (fallback)
+        } else if (process.platform === 'win32' && isUpdateExe) {
+          const downloadPath = item.getSavePath();
+          // Spawn the NSIS installer silently
+          const child = spawn(downloadPath, ['/S', '--updated'], {
+            detached: true,
+            stdio: 'ignore'
+          });
+          child.unref();
+          app.quit();
+        } else if (isUpdate) {
+          // If not mac/win or fallback
           shell.openPath(item.getSavePath());
         }
       } else {

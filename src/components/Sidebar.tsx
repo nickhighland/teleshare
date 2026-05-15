@@ -101,8 +101,12 @@ const Sidebar = () => {
     if (isElectron && latestVersion) {
       try {
         const { ipcRenderer } = (window as any).require('electron');
-        // We know the naming convention for the ZIP file from electron-builder
-        const url = `https://github.com/nickhighland/teleshare/releases/download/v${latestVersion}/TeleShare-${latestVersion}-arm64-mac.zip`;
+        let url = '';
+        if ((window as any).process?.platform === 'win32') {
+          url = `https://github.com/nickhighland/teleshare/releases/download/v${latestVersion}/TeleShare-Setup-${latestVersion}.exe`;
+        } else {
+          url = `https://github.com/nickhighland/teleshare/releases/download/v${latestVersion}/TeleShare-${latestVersion}-arm64-mac.zip`;
+        }
         ipcRenderer.send('start-download', url);
         setIsDownloading(true);
         setDownloadError(null);

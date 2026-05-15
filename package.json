@@ -56,6 +56,12 @@
       ],
       "icon": "public/icon.png"
     },
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "public/icon.png"
+    },
     "files": [
       "dist/**/*",
       "electron/**/*"

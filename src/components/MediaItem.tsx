@@ -87,17 +87,40 @@ const MediaItemComponent: React.FC<MediaItemProps> = ({ item, pageId }) => {
           />
         );
       case 'youtube':
-      case 'webpage':
         return (
           <iframe 
             src={item.url} 
-            title={item.type === 'youtube' ? 'YouTube Video' : 'Webpage Viewer'}
+            title="YouTube Video"
             className={`media-content ${item.type}-content`}
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen
             onMouseDown={(e) => e.stopPropagation()}
           />
         );
+      case 'webpage':
+        // use standard iframe if not in electron (e.g. dev browser preview), otherwise use webview
+        const isElectron = typeof window !== 'undefined' && (window as any).process && (window as any).process.type;
+        if (isElectron) {
+          // React typings don't include webview by default, we cast it or use it as any
+          const Webview = 'webview' as any;
+          return (
+            <Webview 
+              src={item.url} 
+              className={`media-content ${item.type}-content`}
+              onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
+            />
+          );
+        } else {
+          return (
+            <iframe 
+              src={item.url} 
+              title="Webpage Viewer"
+              className={`media-content ${item.type}-content`}
+              allowFullScreen
+              onMouseDown={(e) => e.stopPropagation()}
+            />
+          );
+        }
       case 'text':
         return (
           <textarea
@@ -160,13 +183,13 @@ const MediaItemComponent: React.FC<MediaItemProps> = ({ item, pageId }) => {
             onClick={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
           >
-            {(item.type === 'image' || item.type === 'video' || item.type === 'pdf') && (
+            {(item.type === 'image' || item.type === 'video' || item.type === 'pdf' || item.type === 'text') && (
               <button className="context-menu-item" onClick={handleSave}>
                 <Download size={16} />
                 Save / Download
               </button>
             )}
-            {(item.type === 'youtube' || item.type === 'webpage' || item.type === 'image' || item.type === 'video' || item.type === 'pdf') && item.url && (
+            {(item.type === 'youtube' || item.type === 'webpage') && item.url && (
               <button className="context-menu-item" onClick={handleCopyLink}>
                 <LinkIcon size={16} />
                 Copy Link

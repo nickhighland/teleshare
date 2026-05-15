@@ -48,6 +48,49 @@ const Canvas = () => {
     reader.readAsDataURL(file);
   };
 
+  const processUrl = (urlStr: string, x: number = 50, y: number = 50) => {
+    if (!activePageId) return;
+    
+    let finalUrl = urlStr.trim();
+    if (!finalUrl) return;
+
+    let type: 'webpage' | 'youtube' = 'webpage';
+    let width = 560;
+    let height = 315;
+
+    if (finalUrl.includes('youtube.com/') || finalUrl.includes('youtu.be/')) {
+      type = 'youtube';
+      let videoId = '';
+      if (finalUrl.includes('youtu.be/')) {
+        videoId = finalUrl.split('youtu.be/')[1]?.split('?')[0];
+      } else if (finalUrl.includes('watch?v=')) {
+        try {
+          videoId = new URL(finalUrl).searchParams.get('v') || '';
+        } catch (e) {
+          // Invalid URL format
+        }
+      } else if (finalUrl.includes('embed/')) {
+        videoId = finalUrl.split('embed/')[1]?.split('?')[0];
+      }
+      if (videoId) {
+        finalUrl = `https://www.youtube.com/embed/${videoId}`;
+      }
+    } else {
+      if (!finalUrl.startsWith('http://') && !finalUrl.startsWith('https://')) {
+        finalUrl = 'https://' + finalUrl;
+      }
+    }
+
+    addMediaItem(activePageId, {
+      type,
+      url: finalUrl,
+      x,
+      y,
+      width,
+      height
+    });
+  };
+
   useEffect(() => {
     const handlePaste = (e: ClipboardEvent) => {
       // Ignore if user is typing in an input or textarea
@@ -65,6 +108,13 @@ const Canvas = () => {
           if (file) {
             processFile(file, 50, 50);
           }
+        } else if (items[i].kind === 'string' && items[i].type === 'text/plain') {
+          items[i].getAsString((text) => {
+            const isUrl = /^https?:\/\//i.test(text.trim()) || /^(www\.)?[a-zA-Z0-9-]+\.[a-zA-Z]{2,}/i.test(text.trim());
+            if (isUrl) {
+              processUrl(text, 50, 50);
+            }
+          });
         }
       }
     };
@@ -221,6 +271,16 @@ const Canvas = () => {
     try {
       const clipboardItems = await navigator.clipboard.read();
       for (const clipboardItem of clipboardItems) {
+        if (clipboardItem.types.includes('text/plain')) {
+          const blob = await clipboardItem.getType('text/plain');
+          const text = await blob.text();
+          const isUrl = /^https?:\/\//i.test(text.trim()) || /^(www\.)?[a-zA-Z0-9-]+\.[a-zA-Z]{2,}/i.test(text.trim());
+          if (isUrl) {
+            processUrl(text, contextMenu.x, contextMenu.y);
+            continue;
+          }
+        }
+
         const fileTypes = clipboardItem.types.filter(type => type.startsWith('image/') || type.startsWith('video/') || type === 'application/pdf');
         for (const fileType of fileTypes) {
           const blob = await clipboardItem.getType(fileType);
