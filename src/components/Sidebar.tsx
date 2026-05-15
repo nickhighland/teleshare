@@ -27,6 +27,10 @@ const Sidebar = () => {
   const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
   const [editSectionTitle, setEditSectionTitle] = useState('');
   
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+  
   const [width, setWidth] = useState(300);
   const [isOpen, setIsOpen] = useState(true);
   const [isResizing, setIsResizing] = useState(false);
@@ -59,6 +63,58 @@ const Sidebar = () => {
       document.removeEventListener('mouseup', handleMouseUp);
     };
   }, [isResizing]);
+
+  useEffect(() => {
+    // Check if we're running in Electron
+    const isElectron = typeof window !== 'undefined' && (window as any).require;
+    if (!isElectron) return;
+
+    try {
+      const { ipcRenderer } = (window as any).require('electron');
+      
+      const onProgress = (_: any, progress: number) => setDownloadProgress(progress);
+      const onComplete = () => {
+        setIsDownloading(false);
+        setDownloadProgress(100);
+      };
+      const onError = (_: any, error: string) => {
+        setIsDownloading(false);
+        setDownloadError(error);
+      };
+
+      ipcRenderer.on('download-progress', onProgress);
+      ipcRenderer.on('download-complete', onComplete);
+      ipcRenderer.on('download-error', onError);
+
+      return () => {
+        ipcRenderer.removeListener('download-progress', onProgress);
+        ipcRenderer.removeListener('download-complete', onComplete);
+        ipcRenderer.removeListener('download-error', onError);
+      };
+    } catch (e) {
+      console.warn('Failed to setup IPC listeners:', e);
+    }
+  }, []);
+
+  const handleUpdateClick = () => {
+    const isElectron = typeof window !== 'undefined' && (window as any).require;
+    if (isElectron && latestVersion) {
+      try {
+        const { ipcRenderer } = (window as any).require('electron');
+        // We know the naming convention for the ZIP file from electron-builder
+        const url = `https://github.com/nickhighland/teleshare/releases/download/v${latestVersion}/TeleShare-${latestVersion}-arm64-mac.zip`;
+        ipcRenderer.send('start-download', url);
+        setIsDownloading(true);
+        setDownloadError(null);
+        setDownloadProgress(0);
+        return;
+      } catch (e) {
+        console.warn('Failed to send IPC message:', e);
+      }
+    }
+    // Fallback if not in Electron or IPC fails
+    window.open('https://github.com/nickhighland/teleshare/releases/latest', '_blank');
+  };
 
   const toggleSection = (sectionId: string) => {
     setCollapsedSections(prev => ({
@@ -128,13 +184,6 @@ const Sidebar = () => {
     setEditSectionTitle(currentTitle);
   };
 
-  const saveSectionEdit = (sectionId: string) => {
-    if (editSectionTitle.trim() !== '') {
-      const { updateSectionTitle } = useAppContext(); // ensure it picks up from context. Actually it's already destructured? Wait, I didn't destructure it at the top. Let me just use context directly or add it.
-    }
-    setEditingSectionId(null);
-  };
-
   if (!isOpen) {
     return (
       <div className="sidebar-collapsed">
@@ -153,16 +202,25 @@ const Sidebar = () => {
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <img src="./icon.png" alt="TeleShare Logo" style={{ height: '32px', width: '32px', objectFit: 'contain' }} />
               <h2>TeleShare</h2>
-              {updateAvailable && (
-                <a 
-                  href="https://github.com/nickhighland/teleshare/releases/latest" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="update-badge"
+              {updateAvailable && !isDownloading && (
+                <button 
+                  onClick={handleUpdateClick}
+                  className="update-badge btn-icon-small"
                   title={`Update to v${latestVersion}`}
+                  style={{ width: 'auto', padding: '0 8px', height: '20px', borderRadius: '10px', opacity: 1, backgroundColor: 'var(--accent-color)', color: 'white' }}
                 >
                   <Download size={12} /> Update
-                </a>
+                </button>
+              )}
+              {isDownloading && (
+                <span className="update-badge" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-secondary)' }}>
+                  Downloading {downloadProgress !== null ? `${downloadProgress}%` : '...'}
+                </span>
+              )}
+              {downloadError && (
+                <span className="update-badge" style={{ backgroundColor: '#fee2e2', color: '#ef4444' }}>
+                  Error: {downloadError}
+                </span>
               )}
             </div>
             <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>v{currentVersion}</span>
