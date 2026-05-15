@@ -27,7 +27,7 @@ const Sidebar = () => {
   const [isResizing, setIsResizing] = useState(false);
   const [headerModal, setHeaderModal] = useState({ isOpen: false, inputValue: '' });
   
-  const { updateAvailable, latestVersion, currentVersion } = useUpdateCheck('therapytools', 'teleshare');
+  const { updateAvailable, latestVersion, currentVersion } = useUpdateCheck('nickhighland', 'teleshare');
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -131,7 +131,7 @@ const Sidebar = () => {
               <h2>TeleShare</h2>
               {updateAvailable && (
                 <a 
-                  href="https://github.com/therapytools/teleshare/releases/latest" 
+                  href="https://github.com/nickhighland/teleshare/releases/latest" 
                   target="_blank" 
                   rel="noopener noreferrer"
                   className="update-badge"
