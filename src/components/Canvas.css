@@ -223,3 +223,64 @@
 .btn-primary:hover {
   background-color: var(--accent-hover);
 }
+
+.drag-over {
+  background-color: rgba(59, 130, 246, 0.05); /* light blue tint */
+}
+
+.drag-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  border: 2px dashed var(--accent-color);
+  margin: 1rem;
+  border-radius: var(--radius-lg);
+  pointer-events: none; /* Let drag events fall through to container */
+}
+
+.drag-overlay-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  color: var(--accent-color);
+}
+
+.context-menu {
+  position: absolute;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  padding: 0.5rem;
+  z-index: 1000;
+  min-width: 150px;
+}
+
+.context-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.5rem 1rem;
+  color: var(--text-primary);
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 0.875rem;
+  text-align: left;
+}
+
+.context-menu-item:hover {
+  background-color: var(--bg-primary);
+  color: var(--accent-color);
+}

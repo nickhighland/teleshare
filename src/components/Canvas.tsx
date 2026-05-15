@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Plus, Image as ImageIcon, Video, FileText as PdfIcon, X, Globe, MonitorPlay, Type } from 'lucide-react';
+import { Plus, Image as ImageIcon, Video, FileText as PdfIcon, X, Globe, MonitorPlay, Type, ClipboardPaste } from 'lucide-react';
 import { useAppContext } from '../store/AppContext';
 import MediaItemComponent from './MediaItem';
 import './Canvas.css';
@@ -10,6 +10,43 @@ const Canvas = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadType, setUploadType] = useState<'image' | 'video' | 'pdf' | null>(null);
   const [urlModal, setUrlModal] = useState<{isOpen: boolean, type: 'webpage' | 'youtube' | null, inputValue: string}>({isOpen: false, type: null, inputValue: ''});
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{ x: number, y: number, clientX: number, clientY: number } | null>(null);
+
+  const processFile = (file: File, x: number = 50, y: number = 50) => {
+    if (!activePageId) return;
+    
+    let type: 'image' | 'video' | 'pdf' | null = null;
+    if (file.type.startsWith('image/')) type = 'image';
+    else if (file.type.startsWith('video/')) type = 'video';
+    else if (file.type === 'application/pdf') type = 'pdf';
+    
+    if (!type) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const dataUrl = event.target?.result as string;
+      let width = 300;
+      let height = 200;
+      if (type === 'pdf') {
+        width = 600;
+        height = 800;
+      } else if (type === 'video') {
+        width = 480;
+        height = 270;
+      }
+
+      addMediaItem(activePageId, {
+        type,
+        url: dataUrl,
+        x,
+        y,
+        width,
+        height
+      });
+    };
+    reader.readAsDataURL(file);
+  };
 
   useEffect(() => {
     const handlePaste = (e: ClipboardEvent) => {
@@ -26,18 +63,7 @@ const Canvas = () => {
         if (items[i].type.indexOf('image') !== -1) {
           const file = items[i].getAsFile();
           if (file) {
-            const reader = new FileReader();
-            reader.onload = (event) => {
-              addMediaItem(activePageId, {
-                type: 'image',
-                url: event.target?.result as string,
-                x: 50,
-                y: 50,
-                width: 300,
-                height: 200
-              });
-            };
-            reader.readAsDataURL(file);
+            processFile(file, 50, 50);
           }
           break; // Only handle the first image pasted
         }
@@ -47,6 +73,13 @@ const Canvas = () => {
     document.addEventListener('paste', handlePaste);
     return () => document.removeEventListener('paste', handlePaste);
   }, [activePageId, addMediaItem]);
+
+  // Hide context menu on outside click
+  useEffect(() => {
+    const hideMenu = () => setContextMenu(null);
+    document.addEventListener('click', hideMenu);
+    return () => document.removeEventListener('click', hideMenu);
+  }, []);
 
   if (!activePageId) {
     return (
@@ -139,40 +172,69 @@ const Canvas = () => {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !uploadType) return;
-
-    // Use a FileReader to convert the file to a Base64 URL
-    // Note: For very large videos/PDFs, this might hit storage limits in IndexedDB.
-    // In a real app, we'd upload to a server and return a URL.
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const dataUrl = event.target?.result as string;
-      
-      // Default dimensions based on type
-      let width = 300;
-      let height = 200;
-      if (uploadType === 'pdf') {
-        width = 600;
-        height = 800;
-      } else if (uploadType === 'video') {
-        width = 480;
-        height = 270;
-      }
-
-      addMediaItem(activePageId, {
-        type: uploadType,
-        url: dataUrl,
-        x: 50, // Initial default position
-        y: 50,
-        width,
-        height
-      });
-    };
-    reader.readAsDataURL(file);
+    
+    processFile(file, 50, 50);
 
     // Reset input
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDraggingOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDraggingOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDraggingOver(false);
+    
+    const canvasRect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - canvasRect.left;
+    const y = e.clientY - canvasRect.top;
+
+    const files = Array.from(e.dataTransfer.files);
+    files.forEach(file => processFile(file, x, y));
+  };
+
+  const handleContextMenu = (e: React.MouseEvent) => {
+    // Only show context menu on canvas itself, not on media items
+    if ((e.target as HTMLElement).classList.contains('canvas-area') || (e.target as HTMLElement).classList.contains('dot-grid')) {
+      e.preventDefault();
+      const canvasRect = e.currentTarget.getBoundingClientRect();
+      setContextMenu({
+        x: e.clientX - canvasRect.left,
+        y: e.clientY - canvasRect.top,
+        clientX: e.clientX,
+        clientY: e.clientY
+      });
+    }
+  };
+
+  const handleContextMenuPaste = async () => {
+    if (!contextMenu) return;
+    try {
+      const clipboardItems = await navigator.clipboard.read();
+      for (const clipboardItem of clipboardItems) {
+        const imageTypes = clipboardItem.types.filter(type => type.startsWith('image/'));
+        for (const imageType of imageTypes) {
+          const blob = await clipboardItem.getType(imageType);
+          const file = new File([blob], "pasted-image.png", { type: imageType });
+          processFile(file, contextMenu.x, contextMenu.y);
+          break;
+        }
+      }
+    } catch (err) {
+      console.error('Failed to read clipboard contents: ', err);
+      alert('Unable to read clipboard. You may need to grant clipboard permissions to the browser, or try using Ctrl+V / Cmd+V instead.');
+    }
+    setContextMenu(null);
   };
 
   return (
@@ -186,10 +248,38 @@ const Canvas = () => {
         />
       </div>
 
-      <div className="canvas-area dot-grid">
+      <div 
+        className={`canvas-area dot-grid ${isDraggingOver ? 'drag-over' : ''}`}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        onContextMenu={handleContextMenu}
+      >
+        {isDraggingOver && (
+          <div className="drag-overlay">
+            <div className="drag-overlay-content">
+              <Plus size={48} />
+              <h2>Drop Files Here</h2>
+            </div>
+          </div>
+        )}
+        
         {activePage.mediaItems.map(item => (
           <MediaItemComponent key={item.id} item={item} pageId={activePageId} />
         ))}
+        
+        {contextMenu && (
+          <div 
+            className="context-menu" 
+            style={{ left: contextMenu.clientX, top: contextMenu.clientY }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button className="context-menu-item" onClick={handleContextMenuPaste}>
+              <ClipboardPaste size={16} />
+              Paste Image
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="floating-action-button">
