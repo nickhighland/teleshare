@@ -66,48 +66,40 @@ const Sidebar = () => {
 
   useEffect(() => {
     // Check if we're running in Electron
-    const isElectron = typeof window !== 'undefined' && (window as any).require;
-    if (!isElectron) return;
+    const isElectron = typeof window !== 'undefined' && window.api?.isElectron;
+    
+    if (isElectron) {
+      window.api.onDownloadProgress((_event: any, progress: number) => {
+        setDownloadProgress(progress);
+      });
 
-    try {
-      const { ipcRenderer } = (window as any).require('electron');
-      
-      const onProgress = (_: any, progress: number) => setDownloadProgress(progress);
-      const onComplete = () => {
+      window.api.onDownloadComplete(() => {
         setIsDownloading(false);
         setDownloadProgress(100);
-      };
-      const onError = (_: any, error: string) => {
-        setIsDownloading(false);
-        setDownloadError(error);
-      };
+      });
 
-      ipcRenderer.on('download-progress', onProgress);
-      ipcRenderer.on('download-complete', onComplete);
-      ipcRenderer.on('download-error', onError);
+      window.api.onDownloadError((_event: any, state: string) => {
+        setIsDownloading(false);
+        setDownloadError(`Download failed: ${state}`);
+      });
 
       return () => {
-        ipcRenderer.removeListener('download-progress', onProgress);
-        ipcRenderer.removeListener('download-complete', onComplete);
-        ipcRenderer.removeListener('download-error', onError);
+        window.api.removeDownloadListeners();
       };
-    } catch (e) {
-      console.warn('Failed to setup IPC listeners:', e);
     }
   }, []);
 
   const handleUpdateClick = () => {
-    const isElectron = typeof window !== 'undefined' && (window as any).require;
+    const isElectron = typeof window !== 'undefined' && window.api?.isElectron;
     if (isElectron && latestVersion) {
       try {
-        const { ipcRenderer } = (window as any).require('electron');
         let url = '';
-        if ((window as any).process?.platform === 'win32') {
+        if (window.api.getPlatform() === 'win32') {
           url = `https://github.com/nickhighland/teleshare/releases/download/v${latestVersion}/TeleShare-Setup-${latestVersion}.exe`;
         } else {
           url = `https://github.com/nickhighland/teleshare/releases/download/v${latestVersion}/TeleShare-${latestVersion}-arm64-mac.zip`;
         }
-        ipcRenderer.send('start-download', url);
+        window.api.download(url);
         setIsDownloading(true);
         setDownloadError(null);
         setDownloadProgress(0);

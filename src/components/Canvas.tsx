@@ -13,7 +13,7 @@ const Canvas = () => {
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number, clientX: number, clientY: number } | null>(null);
 
-  const processFile = (file: File, x: number = 50, y: number = 50) => {
+  const processFile = async (file: File, x: number = 50, y: number = 50) => {
     if (!activePageId) return;
     
     let type: 'image' | 'video' | 'pdf' | null = null;
@@ -23,29 +23,44 @@ const Canvas = () => {
     
     if (!type) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const dataUrl = event.target?.result as string;
-      let width = 300;
-      let height = 200;
-      if (type === 'pdf') {
-        width = 600;
-        height = 800;
-      } else if (type === 'video') {
-        width = 480;
-        height = 270;
+    let width = 300;
+    let height = 200;
+    if (type === 'pdf') {
+      width = 600;
+      height = 800;
+    } else if (type === 'video') {
+      width = 480;
+      height = 270;
+    }
+
+    try {
+      let url = '';
+      const isElectron = typeof window !== 'undefined' && window.api?.isElectron;
+      
+      if (isElectron) {
+        const buffer = await file.arrayBuffer();
+        const ext = file.name.split('.').pop() || 'bin';
+        url = await window.api.saveMedia(buffer, ext);
+      } else {
+        // Fallback for web browser testing
+        url = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = (event) => resolve(event.target?.result as string);
+          reader.readAsDataURL(file);
+        });
       }
 
       addMediaItem(activePageId, {
         type,
-        url: dataUrl,
+        url,
         x,
         y,
         width,
         height
       });
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.error('Failed to process file:', err);
+    }
   };
 
   const processUrl = (urlStr: string, x: number = 50, y: number = 50) => {

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Rnd } from 'react-rnd';
-import { Trash2, Maximize2, Download, Link as LinkIcon } from 'lucide-react';
+import { Trash2, Maximize2, Minimize2, Download, Link as LinkIcon, Move } from 'lucide-react';
 import type { MediaItem } from '../types';
 import { useAppContext } from '../store/AppContext';
 import './MediaItem.css';
@@ -14,6 +14,7 @@ const MediaItemComponent: React.FC<MediaItemProps> = ({ item, pageId }) => {
   const { updateMediaItem, deleteMediaItem } = useAppContext();
   const [isHovered, setIsHovered] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number, clientX: number, clientY: number } | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   React.useEffect(() => {
     const hideMenu = () => setContextMenu(null);
@@ -99,7 +100,7 @@ const MediaItemComponent: React.FC<MediaItemProps> = ({ item, pageId }) => {
         );
       case 'webpage':
         // use standard iframe if not in electron (e.g. dev browser preview), otherwise use webview
-        const isElectron = typeof window !== 'undefined' && (window as any).process && (window as any).process.type;
+        const isElectron = typeof window !== 'undefined' && window.api?.isElectron;
         if (isElectron) {
           // React typings don't include webview by default, we cast it or use it as any
           const Webview = 'webview' as any;
@@ -136,6 +137,23 @@ const MediaItemComponent: React.FC<MediaItemProps> = ({ item, pageId }) => {
     }
   };
 
+  if (isFullscreen) {
+    return (
+      <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, backgroundColor: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <button 
+          onClick={() => setIsFullscreen(false)} 
+          style={{ position: 'absolute', top: 20, right: 20, zIndex: 10000, background: 'var(--bg-primary)', border: 'none', borderRadius: '50%', padding: '8px', cursor: 'pointer', display: 'flex' }}
+          title="Exit Full Screen"
+        >
+          <Minimize2 size={24} color="var(--text-primary)" />
+        </button>
+        <div style={{ width: '90%', height: '90%', position: 'relative', display: 'flex', flexDirection: 'column' }}>
+          {renderContent()}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <Rnd
       size={{ width: item.width, height: item.height }}
@@ -153,8 +171,15 @@ const MediaItemComponent: React.FC<MediaItemProps> = ({ item, pageId }) => {
       <div className="media-wrapper" onContextMenu={handleContextMenu}>
         <div className={`media-toolbar ${isHovered ? 'visible' : ''}`}>
           <div className="drag-handle" title="Drag to move">
-            <Maximize2 size={16} />
+            <Move size={16} />
           </div>
+          <button 
+            className="full-screen-btn action-btn" 
+            onClick={() => setIsFullscreen(true)}
+            title="Full Screen"
+          >
+            <Maximize2 size={16} />
+          </button>
           <button 
             className="delete-media-btn" 
             onClick={() => deleteMediaItem(pageId, item.id)}

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, shell, protocol, net } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { exec, spawn } from 'child_process';
@@ -15,22 +15,37 @@ const createWindow = () => {
     width: 1200,
     height: 800,
     webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false, // For simpler migration, but consider true for security in prod
-      webSecurity: false, // Necessary for some iframes and drag/drop local files
-      webviewTag: true // Necessary for embedding external webpages
+      nodeIntegration: false,
+      contextIsolation: true,
+      webSecurity: true, // Re-enabled for security
+      webviewTag: true, // Necessary for embedding external webpages
+      preload: path.join(__dirname, 'preload.js')
     },
   });
 
   mainWindow.webContents.session.on('will-download', (event, item, webContents) => {
     // Only intercept the auto-updater zip file or exe file
-    const isUpdateZip = item.getFilename().endsWith('.zip') && item.getFilename().includes('TeleShare');
-    const isUpdateExe = item.getFilename().endsWith('.exe') && item.getFilename().includes('TeleShare');
-    const isUpdate = isUpdateZip || isUpdateExe;
+    const filename = item.getFilename();
+    const url = item.getURL();
+    
+    const isUpdateZip = filename.endsWith('.zip') && filename.includes('TeleShare');
+    const isUpdateExe = filename.endsWith('.exe') && filename.includes('TeleShare');
+    const isUpdateUrl = url.includes('github.com/nickhighland/teleshare/releases/download/');
+    const isUpdate = isUpdateZip || isUpdateExe || isUpdateUrl;
     
     if (isUpdate) {
       // Save to temp folder without prompt
-      const downloadPath = path.join(app.getPath('temp'), item.getFilename());
+      const downloadPath = path.join(app.getPath('temp'), filename);
+      
+      // If file exists, delete it first to avoid "Interrupted" errors due to locked files
+      if (fs.existsSync(downloadPath)) {
+        try {
+          fs.unlinkSync(downloadPath);
+        } catch (e) {
+          console.error('Failed to delete existing update file:', e);
+        }
+      }
+      
       item.setSavePath(downloadPath);
     } else {
       // For normal downloads (like saving media), don't intercept the save path
@@ -140,6 +155,20 @@ open "${currentAppPath}"
     mainWindow.webContents.downloadURL(url);
   });
 
+  // Handle saving media files to local storage
+  ipcMain.handle('save-media', async (event, buffer, ext) => {
+    const mediaDir = path.join(app.getPath('userData'), 'media');
+    if (!fs.existsSync(mediaDir)) {
+      fs.mkdirSync(mediaDir, { recursive: true });
+    }
+    const filename = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${ext}`;
+    const filePath = path.join(mediaDir, filename);
+    fs.writeFileSync(filePath, Buffer.from(buffer));
+    
+    // Return the custom protocol URI
+    return `teleshare://${filePath}`;
+  });
+
   if (isDev) {
     // In dev, load from Vite dev server
     mainWindow.loadURL('http://localhost:5173');
@@ -153,7 +182,16 @@ open "${currentAppPath}"
 app.commandLine.appendSwitch('password-store', 'basic');
 app.commandLine.appendSwitch('use-mock-keychain');
 
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'teleshare', privileges: { secure: true, standard: true, supportFetchAPI: true, bypassCSP: true } }
+]);
+
 app.whenReady().then(() => {
+  protocol.handle('teleshare', (request) => {
+    const filePath = request.url.replace('teleshare://', '');
+    return net.fetch('file://' + decodeURIComponent(filePath));
+  });
+
   createWindow();
 
   app.on('activate', () => {
@@ -162,5 +200,5 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
+  app.quit();
 });
