@@ -1,0 +1,129 @@
+.media-item-container {
+  position: absolute;
+  background-color: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow 0.2s;
+}
+
+.media-item-container.hovered {
+  box-shadow: var(--shadow-lg);
+  z-index: 50 !important;
+}
+
+.media-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.media-toolbar {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  display: flex;
+  gap: 0.5rem;
+  background-color: var(--bg-glass);
+  backdrop-filter: blur(8px);
+  padding: 0.25rem;
+  border-radius: var(--radius-md);
+  opacity: 0;
+  transition: opacity 0.2s;
+  z-index: 10;
+  border: 1px solid var(--border-light);
+}
+
+.media-toolbar.visible {
+  opacity: 1;
+}
+
+.drag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  cursor: grab;
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.drag-handle:hover {
+  background-color: rgba(255, 255, 255, 0.5);
+  color: var(--text-primary);
+}
+
+.delete-media-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  color: var(--danger-color);
+  border-radius: var(--radius-sm);
+  transition: background-color 0.2s;
+}
+
+.delete-media-btn:hover {
+  background-color: #fee2e2;
+}
+
+.media-content {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: var(--radius-md);
+}
+
+.image-content {
+  pointer-events: none; /* Let drag events pass through */
+}
+
+.video-content {
+  background-color: #000;
+}
+
+.pdf-content,
+.youtube-content,
+.webpage-content {
+  border: none;
+  background-color: white;
+}
+
+.text-content {
+  border: 1px solid var(--border-light);
+  background-color: var(--bg-secondary);
+  padding: 1rem;
+  resize: none;
+  font-family: inherit;
+  font-size: 1rem;
+  color: var(--text-primary);
+  outline: none;
+}
+
+.text-content:focus {
+  border-color: var(--border-focus);
+}
+
+.iframe-drag-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 40px; /* Transparent top area to allow dragging iframe */
+  cursor: grab;
+  z-index: 5;
+  width: auto;
+}
+
+.iframe-drag-overlay:active {
+  cursor: grabbing;
+}
