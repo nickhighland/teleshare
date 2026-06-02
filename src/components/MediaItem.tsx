@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { Rnd } from 'react-rnd';
-import { Trash2, Maximize2, Minimize2, Download, Link as LinkIcon, Move } from 'lucide-react';
+import { Trash2, Maximize2, Minimize2, Download, Link as LinkIcon, Move, PencilLine } from 'lucide-react';
 import type { MediaItem } from '../types';
 import { useAppContext } from '../store/AppContext';
 import './MediaItem.css';
+import './MarkupEditor.css';
+import MarkupEditor, { renderAnnotationLayer } from './MarkupEditor';
 
 interface MediaItemProps {
   item: MediaItem;
@@ -15,6 +17,7 @@ const MediaItemComponent: React.FC<MediaItemProps> = ({ item, pageId }) => {
   const [isHovered, setIsHovered] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number, clientX: number, clientY: number } | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isMarkupOpen, setIsMarkupOpen] = useState(false);
 
   React.useEffect(() => {
     const hideMenu = () => setContextMenu(null);
@@ -137,6 +140,8 @@ const MediaItemComponent: React.FC<MediaItemProps> = ({ item, pageId }) => {
     }
   };
 
+  const canMarkup = item.type === 'image' || item.type === 'pdf' || item.type === 'text';
+
   if (isFullscreen) {
     return (
       <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, backgroundColor: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -149,81 +154,97 @@ const MediaItemComponent: React.FC<MediaItemProps> = ({ item, pageId }) => {
         </button>
         <div style={{ width: '90%', height: '90%', position: 'relative', display: 'flex', flexDirection: 'column' }}>
           {renderContent()}
+          {renderAnnotationLayer(item.annotations)}
         </div>
       </div>
     );
   }
 
   return (
-    <Rnd
-      size={{ width: item.width, height: item.height }}
-      position={{ x: item.x, y: item.y }}
-      onDragStop={handleDragStop}
-      onResizeStop={handleResizeStop}
-      bounds="parent"
-      className={`media-item-container ${isHovered ? 'hovered' : ''}`}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      dragHandleClassName="drag-handle"
-      minWidth={150}
-      minHeight={150}
-    >
-      <div className="media-wrapper" onContextMenu={handleContextMenu}>
-        <div className={`media-toolbar ${isHovered ? 'visible' : ''}`}>
-          <div className="drag-handle" title="Drag to move">
-            <Move size={16} />
+    <>
+      <Rnd
+        size={{ width: item.width, height: item.height }}
+        position={{ x: item.x, y: item.y }}
+        onDragStop={handleDragStop}
+        onResizeStop={handleResizeStop}
+        bounds="parent"
+        className={`media-item-container ${isHovered ? 'hovered' : ''}`}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        dragHandleClassName="drag-handle"
+        minWidth={150}
+        minHeight={150}
+      >
+        <div className="media-wrapper" onContextMenu={handleContextMenu}>
+          <div className={`media-toolbar ${isHovered ? 'visible' : ''}`}>
+            <div className="drag-handle" title="Drag to move">
+              <Move size={16} />
+            </div>
+            {canMarkup && (
+              <button
+                className="markup-media-btn action-btn"
+                onClick={() => setIsMarkupOpen(true)}
+                title="Open markup editor"
+              >
+                <PencilLine size={16} />
+              </button>
+            )}
+            <button 
+              className="full-screen-btn action-btn" 
+              onClick={() => setIsFullscreen(true)}
+              title="Full Screen"
+            >
+              <Maximize2 size={16} />
+            </button>
+            <button 
+              className="delete-media-btn" 
+              onClick={() => deleteMediaItem(pageId, item.id)}
+              title="Delete media"
+            >
+              <Trash2 size={16} />
+            </button>
           </div>
-          <button 
-            className="full-screen-btn action-btn" 
-            onClick={() => setIsFullscreen(true)}
-            title="Full Screen"
-          >
-            <Maximize2 size={16} />
-          </button>
-          <button 
-            className="delete-media-btn" 
-            onClick={() => deleteMediaItem(pageId, item.id)}
-            title="Delete media"
-          >
-            <Trash2 size={16} />
-          </button>
-        </div>
-        
-        {/* Iframe-based media need an overlay when dragging so iframe doesn't steal mouse events */}
-        {(item.type === 'pdf' || item.type === 'webpage' || item.type === 'youtube') && (
-          <div className="iframe-drag-overlay drag-handle"></div>
-        )}
-        
-        {renderContent()}
+          
+          {/* Iframe-based media need an overlay when dragging so iframe doesn't steal mouse events */}
+          {(item.type === 'pdf' || item.type === 'webpage' || item.type === 'youtube') && (
+            <div className="iframe-drag-overlay drag-handle"></div>
+          )}
+          
+          {renderContent()}
+          {renderAnnotationLayer(item.annotations)}
 
-        {contextMenu && (
-          <div 
-            className="context-menu" 
-            style={{ 
-              position: 'fixed',
-              left: contextMenu.clientX, 
-              top: contextMenu.clientY,
-              zIndex: 10000 
-            }}
-            onClick={(e) => e.stopPropagation()}
-            onMouseDown={(e) => e.stopPropagation()}
-          >
-            {(item.type === 'image' || item.type === 'video' || item.type === 'pdf' || item.type === 'text') && (
-              <button className="context-menu-item" onClick={handleSave}>
-                <Download size={16} />
-                Save / Download
-              </button>
-            )}
-            {(item.type === 'youtube' || item.type === 'webpage') && item.url && (
-              <button className="context-menu-item" onClick={handleCopyLink}>
-                <LinkIcon size={16} />
-                Copy Link
-              </button>
-            )}
-          </div>
-        )}
-      </div>
-    </Rnd>
+          {contextMenu && (
+            <div 
+              className="context-menu" 
+              style={{ 
+                position: 'fixed',
+                left: contextMenu.clientX, 
+                top: contextMenu.clientY,
+                zIndex: 10000 
+              }}
+              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              {(item.type === 'image' || item.type === 'video' || item.type === 'pdf' || item.type === 'text') && (
+                <button className="context-menu-item" onClick={handleSave}>
+                  <Download size={16} />
+                  Save / Download
+                </button>
+              )}
+              {(item.type === 'youtube' || item.type === 'webpage') && item.url && (
+                <button className="context-menu-item" onClick={handleCopyLink}>
+                  <LinkIcon size={16} />
+                  Copy Link
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </Rnd>
+      {isMarkupOpen && canMarkup && (
+        <MarkupEditor item={item} pageId={pageId} onClose={() => setIsMarkupOpen(false)} />
+      )}
+    </>
   );
 };
 

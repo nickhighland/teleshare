@@ -10,6 +10,24 @@ const __dirname = path.dirname(__filename);
 
 const isDev = process.env.NODE_ENV === 'development';
 
+const getMimeType = (filePath) => {
+  const ext = path.extname(filePath).toLowerCase();
+  switch (ext) {
+    case '.png': return 'image/png';
+    case '.jpg':
+    case '.jpeg': return 'image/jpeg';
+    case '.gif': return 'image/gif';
+    case '.webp': return 'image/webp';
+    case '.bmp': return 'image/bmp';
+    case '.svg': return 'image/svg+xml';
+    case '.mp4': return 'video/mp4';
+    case '.webm': return 'video/webm';
+    case '.mov': return 'video/quicktime';
+    case '.pdf': return 'application/pdf';
+    default: return 'application/octet-stream';
+  }
+};
+
 const createWindow = () => {
   const mainWindow = new BrowserWindow({
     width: 1200,
@@ -189,7 +207,14 @@ protocol.registerSchemesAsPrivileged([
 app.whenReady().then(() => {
   protocol.handle('teleshare', (request) => {
     const filePath = request.url.replace('teleshare://', '');
-    return net.fetch('file://' + decodeURIComponent(filePath));
+    const resolvedPath = decodeURIComponent(filePath);
+    const data = fs.readFileSync(resolvedPath);
+    return new Response(data, {
+      headers: {
+        'Content-Type': getMimeType(resolvedPath),
+        'Content-Length': String(data.byteLength)
+      }
+    });
   });
 
   createWindow();
