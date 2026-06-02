@@ -224,61 +224,39 @@ const MarkupEditor: React.FC<MarkupEditorProps> = ({ item, pageId, onClose }) =>
         </div>
 
         <div className="markup-toolbar">
-          <button className={`markup-tool ${tool === 'pen' ? 'active' : ''}`} onClick={() => setTool('pen')}>
-            <PenLine size={16} />
-            Draw
-          </button>
-          <button className={`markup-tool ${tool === 'highlight' ? 'active' : ''}`} onClick={() => setTool('highlight')}>
-            <Highlighter size={16} />
-            Highlight
-          </button>
-          <button className={`markup-tool ${tool === 'text' ? 'active' : ''}`} onClick={() => setTool('text')}>
-            <Type size={16} />
-            Text
-          </button>
-          <label className="markup-toggle">
-            <input
-              type="checkbox"
-              checked={persistChanges}
-              onChange={(event) => setPersistChanges(event.target.checked)}
-            />
-            Keep changes after close
-          </label>
-          <button className="markup-tool secondary" onClick={undoLast} disabled={!annotations.length}>
-            <Undo2 size={16} />
-            Undo
-          </button>
-          <button className="markup-tool secondary" onClick={clearAll} disabled={!annotations.length}>
-            <Trash2 size={16} />
-            Clear
-          </button>
-          <button className="markup-tool primary" onClick={commitChanges}>
-            <Check size={16} />
-            {persistChanges ? 'Save changes' : 'Use for this session'}
-          </button>
-        </div>
-
-        <div className="markup-settings">
-          <div className="markup-setting-group">
-            <div className="markup-setting-label">
-              <Palette size={14} />
-              Color
-            </div>
-            <div className="markup-color-grid">
-              {colorOptions.map((color) => (
-                <button
-                  key={color}
-                  className={`markup-color-swatch ${selectedColor === color ? 'active' : ''}`}
-                  style={{ backgroundColor: color }}
-                  onClick={() => setSelectedColor(color)}
-                  aria-label={`Select ${color} color`}
-                />
-              ))}
-            </div>
+          <div className="markup-tool-strip">
+            <button className={`markup-tool icon-only ${tool === 'pen' ? 'active' : ''}`} onClick={() => setTool('pen')} title="Draw" aria-label="Draw">
+              <PenLine size={14} />
+            </button>
+            <button className={`markup-tool icon-only ${tool === 'highlight' ? 'active' : ''}`} onClick={() => setTool('highlight')} title="Highlight" aria-label="Highlight">
+              <Highlighter size={14} />
+            </button>
+            <button className={`markup-tool icon-only ${tool === 'text' ? 'active' : ''}`} onClick={() => setTool('text')} title="Text" aria-label="Text">
+              <Type size={14} />
+            </button>
           </div>
-          {tool !== 'text' && (
-            <label className="markup-setting-group markup-slider-group">
-              <div className="markup-setting-label">Width</div>
+
+          <div className="markup-inline-controls">
+            <div className="markup-inline-group">
+              <div className="markup-setting-label compact">
+                <Palette size={12} />
+                Color
+              </div>
+              <div className="markup-color-grid compact">
+                {colorOptions.map((color) => (
+                  <button
+                    key={color}
+                    className={`markup-color-swatch ${selectedColor === color ? 'active' : ''}`}
+                    style={{ backgroundColor: color }}
+                    onClick={() => setSelectedColor(color)}
+                    aria-label={`Select ${color} color`}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <label className="markup-inline-group markup-slider-inline">
+              <div className="markup-setting-label compact">Width</div>
               <input
                 type="range"
                 min="1"
@@ -287,19 +265,39 @@ const MarkupEditor: React.FC<MarkupEditorProps> = ({ item, pageId, onClose }) =>
                 onChange={(event) => setStrokeWidth(Number(event.target.value))}
               />
             </label>
-          )}
-          {tool === 'text' && (
-            <label className="markup-setting-group markup-text-group">
-              <div className="markup-setting-label">Text to place</div>
+
+            <label className="markup-inline-group markup-text-inline">
+              <div className="markup-setting-label compact">Text</div>
               <input
-                className="markup-text-input"
+                className="markup-text-input compact"
                 type="text"
                 value={textLabel}
                 onChange={(event) => setTextLabel(event.target.value)}
-                placeholder="Type a label, then click the canvas"
+                placeholder="Label"
               />
             </label>
-          )}
+
+            <label className="markup-inline-group markup-toggle compact">
+              <input
+                type="checkbox"
+                checked={persistChanges}
+                onChange={(event) => setPersistChanges(event.target.checked)}
+              />
+              Save
+            </label>
+          </div>
+
+          <div className="markup-toolbar-actions">
+            <button className="markup-tool icon-only secondary" onClick={undoLast} disabled={!annotations.length} title="Undo" aria-label="Undo">
+              <Undo2 size={14} />
+            </button>
+            <button className="markup-tool icon-only secondary" onClick={clearAll} disabled={!annotations.length} title="Clear" aria-label="Clear">
+              <Trash2 size={14} />
+            </button>
+            <button className="markup-tool icon-only primary" onClick={commitChanges} title={persistChanges ? 'Save changes' : 'Use for this session'} aria-label={persistChanges ? 'Save changes' : 'Use for this session'}>
+              <Check size={14} />
+            </button>
+          </div>
         </div>
 
         <div className={`markup-body ${item.type === 'text' ? 'text-layout' : ''}`}>
@@ -334,10 +332,8 @@ const MarkupEditor: React.FC<MarkupEditorProps> = ({ item, pageId, onClose }) =>
         </div>
 
         <div className="markup-footer">
-          <button className="markup-tool secondary" onClick={onClose}>Discard</button>
-          <button className="markup-tool primary" onClick={commitChanges}>
-            <Check size={16} />
-            {persistChanges ? 'Save changes' : 'Use for this session'}
+          <button className="markup-tool icon-only secondary" onClick={onClose} title="Discard" aria-label="Discard">
+            <X size={14} />
           </button>
         </div>
       </div>
