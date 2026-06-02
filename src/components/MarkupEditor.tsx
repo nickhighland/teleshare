@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { X, PenLine, Highlighter, Type, Undo2, Trash2, Check } from 'lucide-react';
+import { X, PenLine, Highlighter, Type, Undo2, Trash2, Check, Palette } from 'lucide-react';
 import type { Annotation, AnnotationPoint, AnnotationTool, MediaItem } from '../types';
 import { useAppContext } from '../store/AppContext';
 import './MarkupEditor.css';
@@ -12,10 +12,20 @@ interface MarkupEditorProps {
 }
 
 const toolStyles: Record<AnnotationTool, { color: string; opacity: number; strokeWidth: number; fontSize: number }> = {
-  pen: { color: '#f97316', opacity: 1, strokeWidth: 0.9, fontSize: 18 },
-  highlight: { color: '#facc15', opacity: 0.38, strokeWidth: 4.2, fontSize: 18 },
+  pen: { color: '#f97316', opacity: 1, strokeWidth: 4, fontSize: 18 },
+  highlight: { color: '#facc15', opacity: 0.42, strokeWidth: 10, fontSize: 18 },
   text: { color: '#111827', opacity: 1, strokeWidth: 0, fontSize: 18 }
 };
+
+const colorOptions = [
+  '#f97316',
+  '#ef4444',
+  '#eab308',
+  '#22c55e',
+  '#3b82f6',
+  '#8b5cf6',
+  '#111827',
+];
 
 const createAnnotation = (tool: AnnotationTool, points: AnnotationPoint[], text?: string): Annotation => ({
   id: uuidv4(),
@@ -83,9 +93,14 @@ export const renderAnnotationLayer = (annotations: Annotation[] = [], activeAnno
 const MarkupEditor: React.FC<MarkupEditorProps> = ({ item, pageId, onClose }) => {
   const { updateMediaItem } = useAppContext();
   const surfaceRef = useRef<HTMLDivElement>(null);
+  const draftStrokeRef = useRef<Annotation | null>(null);
   const [tool, setTool] = useState<AnnotationTool>('pen');
   const [annotations, setAnnotations] = useState<Annotation[]>(item.annotations ?? []);
   const [draftText, setDraftText] = useState(item.content ?? '');
+  const [textLabel, setTextLabel] = useState('');
+  const [selectedColor, setSelectedColor] = useState(toolStyles.pen.color);
+  const [strokeWidth, setStrokeWidth] = useState(toolStyles.pen.strokeWidth);
+  const [persistChanges, setPersistChanges] = useState(true);
   const [currentStroke, setCurrentStroke] = useState<Annotation | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
 
@@ -98,11 +113,20 @@ const MarkupEditor: React.FC<MarkupEditorProps> = ({ item, pageId, onClose }) =>
   }, [item.content]);
 
   useEffect(() => {
-    updateMediaItem(pageId, item.id, {
-      annotations,
-      ...(item.type === 'text' ? { content: draftText } : {})
-    });
-  }, [annotations, draftText, item.id, item.type, pageId, updateMediaItem]);
+    const defaults = toolStyles[tool];
+    setSelectedColor(defaults.color);
+    setStrokeWidth(defaults.strokeWidth);
+  }, [tool]);
+
+  const commitChanges = () => {
+    if (persistChanges) {
+      updateMediaItem(pageId, item.id, {
+        annotations,
+        ...(item.type === 'text' ? { content: draftText } : {})
+      });
+    }
+    onClose();
+  };
 
   const surfacePreview = useMemo(() => renderAnnotationLayer(annotations, currentStroke, true), [annotations, currentStroke]);
 
@@ -112,32 +136,52 @@ const MarkupEditor: React.FC<MarkupEditorProps> = ({ item, pageId, onClose }) =>
     const point = pointFromEvent(surfaceRef.current, event);
 
     if (tool === 'text') {
-      const label = window.prompt('Text label');
-      if (!label?.trim()) {
+      const label = textLabel.trim();
+      if (!label) {
         return;
       }
 
-      setAnnotations(prev => [...prev, createAnnotation('text', [point], label.trim())]);
+      setAnnotations(prev => [
+        ...prev,
+        {
+          ...createAnnotation('text', [point], label.trim()),
+          color: selectedColor,
+        }
+      ]);
       return;
     }
 
     event.preventDefault();
     surfaceRef.current.setPointerCapture(event.pointerId);
     setIsDrawing(true);
-    setCurrentStroke(createAnnotation(tool, [point]));
+    const stroke = {
+      ...createAnnotation(tool, [point]),
+      color: selectedColor,
+      strokeWidth: strokeWidth,
+      opacity: tool === 'highlight' ? 0.42 : 1,
+    };
+    draftStrokeRef.current = stroke;
+    setCurrentStroke(stroke);
   };
 
   const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!isDrawing || !surfaceRef.current || !currentStroke) return;
+    if (!isDrawing || !surfaceRef.current || !draftStrokeRef.current) return;
 
     const point = pointFromEvent(surfaceRef.current, event);
-    setCurrentStroke(prev => prev ? { ...prev, points: [...prev.points, point] } : prev);
+    draftStrokeRef.current = {
+      ...draftStrokeRef.current,
+      points: [...draftStrokeRef.current.points, point]
+    };
+    setCurrentStroke(draftStrokeRef.current);
   };
 
   const finishStroke = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!surfaceRef.current || !currentStroke) {
+    const finishedStroke = draftStrokeRef.current;
+
+    if (!surfaceRef.current || !finishedStroke) {
       setIsDrawing(false);
       setCurrentStroke(null);
+      draftStrokeRef.current = null;
       return;
     }
 
@@ -147,10 +191,11 @@ const MarkupEditor: React.FC<MarkupEditorProps> = ({ item, pageId, onClose }) =>
 
     setIsDrawing(false);
 
-    if (currentStroke.points.length > 1) {
-      setAnnotations(prev => [...prev, currentStroke]);
+    if (finishedStroke.points.length > 1) {
+      setAnnotations(prev => [...prev, finishedStroke]);
     }
 
+    draftStrokeRef.current = null;
     setCurrentStroke(null);
   };
 
@@ -161,6 +206,7 @@ const MarkupEditor: React.FC<MarkupEditorProps> = ({ item, pageId, onClose }) =>
   const clearAll = () => {
     setAnnotations([]);
     setCurrentStroke(null);
+    draftStrokeRef.current = null;
   };
 
   return (
@@ -190,6 +236,14 @@ const MarkupEditor: React.FC<MarkupEditorProps> = ({ item, pageId, onClose }) =>
             <Type size={16} />
             Text
           </button>
+          <label className="markup-toggle">
+            <input
+              type="checkbox"
+              checked={persistChanges}
+              onChange={(event) => setPersistChanges(event.target.checked)}
+            />
+            Keep changes after close
+          </label>
           <button className="markup-tool secondary" onClick={undoLast} disabled={!annotations.length}>
             <Undo2 size={16} />
             Undo
@@ -198,10 +252,54 @@ const MarkupEditor: React.FC<MarkupEditorProps> = ({ item, pageId, onClose }) =>
             <Trash2 size={16} />
             Clear
           </button>
-          <button className="markup-tool primary" onClick={onClose}>
+          <button className="markup-tool primary" onClick={commitChanges}>
             <Check size={16} />
-            Done
+            {persistChanges ? 'Save changes' : 'Use for this session'}
           </button>
+        </div>
+
+        <div className="markup-settings">
+          <div className="markup-setting-group">
+            <div className="markup-setting-label">
+              <Palette size={14} />
+              Color
+            </div>
+            <div className="markup-color-grid">
+              {colorOptions.map((color) => (
+                <button
+                  key={color}
+                  className={`markup-color-swatch ${selectedColor === color ? 'active' : ''}`}
+                  style={{ backgroundColor: color }}
+                  onClick={() => setSelectedColor(color)}
+                  aria-label={`Select ${color} color`}
+                />
+              ))}
+            </div>
+          </div>
+          {tool !== 'text' && (
+            <label className="markup-setting-group markup-slider-group">
+              <div className="markup-setting-label">Width</div>
+              <input
+                type="range"
+                min="1"
+                max="24"
+                value={strokeWidth}
+                onChange={(event) => setStrokeWidth(Number(event.target.value))}
+              />
+            </label>
+          )}
+          {tool === 'text' && (
+            <label className="markup-setting-group markup-text-group">
+              <div className="markup-setting-label">Text to place</div>
+              <input
+                className="markup-text-input"
+                type="text"
+                value={textLabel}
+                onChange={(event) => setTextLabel(event.target.value)}
+                placeholder="Type a label, then click the canvas"
+              />
+            </label>
+          )}
         </div>
 
         <div className={`markup-body ${item.type === 'text' ? 'text-layout' : ''}`}>
@@ -226,7 +324,6 @@ const MarkupEditor: React.FC<MarkupEditorProps> = ({ item, pageId, onClose }) =>
               onPointerMove={handlePointerMove}
               onPointerUp={finishStroke}
               onPointerCancel={finishStroke}
-              onPointerLeave={finishStroke}
             >
               {item.type === 'image' && <img src={item.url} alt="Markup target" className="markup-media" draggable="false" />}
               {item.type === 'pdf' && <iframe src={item.url} title="Markup PDF" className="markup-media markup-frame" />}
@@ -234,6 +331,14 @@ const MarkupEditor: React.FC<MarkupEditorProps> = ({ item, pageId, onClose }) =>
               {surfacePreview}
             </div>
           </div>
+        </div>
+
+        <div className="markup-footer">
+          <button className="markup-tool secondary" onClick={onClose}>Discard</button>
+          <button className="markup-tool primary" onClick={commitChanges}>
+            <Check size={16} />
+            {persistChanges ? 'Save changes' : 'Use for this session'}
+          </button>
         </div>
       </div>
     </div>
